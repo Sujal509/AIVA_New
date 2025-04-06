@@ -6,6 +6,70 @@ const FaceDescriptorFromPhoto = () => {
     const imageRef = useRef();
     const [descriptor, setDescriptor] = useState(null);
 
+    const newDataTest = async () => {
+
+        const descriptorArray = Object.values(descriptor);
+    
+        const mydata = {
+            "name": "Abcd",
+            "password": "Tester@1234567",
+            "batch": "B42",
+            "subBatch": "A1",
+            "empId": "6574831aaaaaa",
+            "faceDescriptors": [descriptorArray]
+        }
+        
+        let abcd = await fetch("http://localhost:5000/api/trainne/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(mydata)
+        });
+        console.log(abcd.body);
+    
+        const resp = await abcd.json();
+    
+        console.log(resp);
+    }
+
+    const sendData = async () => {
+
+        const descriptorArray = Object.values(descriptor);
+
+        const mydata = {
+            "name": "Abcd",
+            "password": "Tester@1234567",
+            "batch": "B42",
+            "subBatch": "A1",
+            "empId": "6574831aaaaaa",
+            "faceDescriptors": [descriptorArray]
+        }
+
+        // const actual = await JSON.stringify(mydata);
+
+        let abcd = await fetch("http://localhost:5000/api/trainne/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(mydata)
+        });
+        
+
+        // let abcd = await fetch("http://localhost:5000/api/trainne/register", { method: "POST",body:mydata });
+        console.log(abcd.body);
+
+        const resp = await abcd.json();
+
+        console.log(resp);
+
+
+        console.log(descriptorArray);
+
+
+    }
+
     useEffect(() => {
         const loadModels = async () => {
             await faceapi.nets.ssdMobilenetv1.loadFromUri("/models");
@@ -55,6 +119,11 @@ const FaceDescriptorFromPhoto = () => {
                     {JSON.stringify(descriptor, null, 2)}
                 </pre>
             )}
+
+            <button onClick={sendData} >Register</button>
+            <br /><br />
+            <button onClick={newDataTest} >Login</button>
+
         </div>
     );
 };
