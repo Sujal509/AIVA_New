@@ -5,7 +5,7 @@ const { addToBlacklist } = require("../utils/tokenBlacklist");
 const { encryptDescriptor, decryptDescriptor } = require("../utils/cryptoUtil");
 const Trainne = require("../models/Trainne");
 
-const FACE_MATCH_THRESHOLD = 0.45;
+const FACE_MATCH_THRESHOLD = 0.5;
 
 exports.trainneRegister = async (req, res, next) => {
     try {
