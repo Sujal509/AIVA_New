@@ -2,26 +2,27 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { euclideanDistance } = require("../utils/distanceUtil");
 const { addToBlacklist } = require("../utils/tokenBlacklist");
+const { encryptDescriptor, decryptDescriptor } = require("../utils/cryptoUtil");
 const Trainne = require("../models/Trainne");
 
 const FACE_MATCH_THRESHOLD = 0.45;
 
 exports.trainneRegister = async (req, res, next) => {
     try {
-        const { name, empId, batch, subBatch, password, faceDescriptors } = req.body;
+        const { name, empId, batch, subBatch, faceDescriptors } = req.body;
 
         const trainne = await Trainne.findOne({ empId });
-        if (trainne) return res.status(400).json({ msg: "Trainne already exists" });
-
-        const hashedPwd = await bcrypt.hash(password, 12);
+        if (trainne) {
+            return res.status(400).json({ msg: "Trainne already exists" });
+        }
+        const encryptedDescriptors = faceDescriptors.map(desc => encryptDescriptor(desc));
 
         const student = new Trainne({
             name,
             empId,
             batch,
             subBatch,
-            password: hashedPwd,
-            faceDescriptors: faceDescriptors.map(desc => ({ descriptor: desc }))
+            faceDescriptors: encryptedDescriptors
         });
 
         await student.save();
@@ -37,20 +38,42 @@ exports.trainneFaceLogin = async (req, res, next) => {
     try {
         const { faceDescriptors } = req.body;
 
-        if (!faceDescriptors || !Array.isArray(faceDescriptors) /*|| descriptor.length !== 128*/) {
+        if (
+            !faceDescriptors ||
+            !Array.isArray(faceDescriptors) ||
+            faceDescriptors.length !== 1 ||
+            !Array.isArray(faceDescriptors[0]) ||
+            faceDescriptors[0].length !== 128
+        ) {
             return res.status(400).json({ msg: "Invalid descriptor data" });
         }
 
-        const trainnes = await Trainne.find({});
+        const descriptorToMatch = faceDescriptors[0];
 
+        const trainnes = await Trainne.find({});
         let matchedTrainne = null;
 
         for (const trainne of trainnes) {
-            const distance = euclideanDistance(faceDescriptors, trainne.faceDescriptors);
-            if (distance < FACE_MATCH_THRESHOLD) {
-                matchedTrainne = trainne;
-                break;
+            for (const encrypted of trainne.faceDescriptors) {
+                if (typeof encrypted !== "string") continue;
+
+                let storedDescriptor;
+                try {
+                    storedDescriptor = decryptDescriptor(encrypted);
+                } catch (err) {
+                    console.error("Decryption failed :- ", err.message);
+                    continue;
+                }
+
+                const distance = euclideanDistance(storedDescriptor, descriptorToMatch);
+
+                if (distance < FACE_MATCH_THRESHOLD) {
+                    matchedTrainne = trainne;
+                    break;
+                }
             }
+
+            if (matchedTrainne) break;
         }
 
         if (!matchedTrainne) {
@@ -66,7 +89,7 @@ exports.trainneFaceLogin = async (req, res, next) => {
             role: "trainne"
         };
 
-        const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "1hr" });
+        const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "1h" });
 
         return res.status(200).json({ msg: "Login successful", token, user });
 
@@ -76,17 +99,18 @@ exports.trainneFaceLogin = async (req, res, next) => {
 };
 
 
-exports.trainneLogout = (req, res,next) => {
+
+exports.trainneLogout = (req, res, next) => {
     try {
-        
+
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
             return res.status(400).json({ msg: "No token provided" });
         }
-    
+
         const token = authHeader.split(" ")[1];
         addToBlacklist(token);
-    
+
         return res.status(200).json({ msg: "Logout successful" });
     } catch (err) {
         next(err);
